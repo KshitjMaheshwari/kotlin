@@ -14,8 +14,42 @@ import org.jetbrains.kotlin.load.kotlin.NON_EXISTENT_CLASS_NAME
 import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.Name
 
+
+
 object PsiClassRenderer {
-    private fun PsiType.renderType() = getCanonicalText(true)
+
+    var extendedTypeRenderer = false
+
+    private fun PsiType.renderType() = if (extendedTypeRenderer) extendedRenderType(StringBuffer()) else getCanonicalText(true)
+    private fun PsiType.extendedRenderType(sb: StringBuffer): String {
+        if (annotations.isNotEmpty()) {
+            sb.append(annotations.joinToString(" ", postfix = " ") { it.renderAnnotation() })
+        }
+        when (this) {
+            is PsiClassType -> {
+                sb.append(this.className)
+                if (parameterCount > 0) {
+                    sb.append("<")
+                    parameters.forEachIndexed { index, type ->
+                        type.extendedRenderType(sb)
+                        if (index < parameterCount - 1) sb.append(", ")
+                    }
+                    sb.append(">")
+                }
+            }
+            is PsiArrayType -> {
+                sb.append("[")
+                componentType.extendedRenderType(sb)
+                sb.append("]")
+            }
+            else -> {
+                sb.append(canonicalText)
+            }
+        }
+
+        return sb.toString()
+    }
+
 
     private fun PsiReferenceList?.renderRefList(keyword: String, sortReferences: Boolean = true): String {
         if (this == null) return ""
