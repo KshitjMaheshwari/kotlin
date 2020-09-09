@@ -41,6 +41,17 @@ class ConfigurationCacheForAndroidIT : AbstractConfigurationCacheIT() {
         testConfigurationCacheOf(":Lib:compileFlavor1DebugKotlin", ":Android:compileFlavor1DebugKotlin")
     }
 
+    @Test
+    fun testKotlinAndroidProjectWithJetifier() = with(Project("AndroidIncrementalMultiModule")) {
+        applyAndroid40Alpha4KotlinVersionWorkaround()
+        this.projectDir.resolve("gradle.properties").appendText("""
+            
+            android.useAndroidX=true
+            android.enableJetifier=true
+        """.trimIndent())
+        testConfigurationCacheOf(":app:compileDebugAndroidTestJavaWithJavac")
+    }
+
     /**
      * Android Gradle plugin 4.0-alpha4 depends on the EAP versions of some o.j.k modules.
      * Force the current Kotlin version, so the EAP versions are not queried from the
