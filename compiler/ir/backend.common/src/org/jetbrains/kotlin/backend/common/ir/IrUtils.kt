@@ -440,39 +440,41 @@ val IrFunction.allParameters: List<IrValueParameter>
         explicitParameters
     }
 
+private object FakeOverrideBuilder : FakeOverrideBuilderStrategy() {
+    override fun linkFakeOverride(fakeOverride: IrOverridableMember) {
+        when (fakeOverride) {
+            is IrFakeOverrideFunction -> linkFunctionFakeOverride(fakeOverride)
+            is IrFakeOverrideProperty -> linkPropertyFakeOverride(fakeOverride)
+            else -> error("Unexpected fake override: $fakeOverride")
+        }
+    }
+
+    private fun linkFunctionFakeOverride(declaration: IrFakeOverrideFunction) {
+        declaration.acquireSymbol(IrSimpleFunctionSymbolImpl(WrappedSimpleFunctionDescriptor()))
+    }
+
+    private fun linkPropertyFakeOverride(declaration: IrFakeOverrideProperty) {
+        val propertySymbol = IrPropertySymbolImpl(WrappedPropertyDescriptor())
+        declaration.getter?.let { it.correspondingPropertySymbol = propertySymbol }
+        declaration.setter?.let { it.correspondingPropertySymbol = propertySymbol }
+
+        declaration.acquireSymbol(propertySymbol)
+
+        declaration.getter?.let {
+            it.correspondingPropertySymbol = declaration.symbol
+            linkFunctionFakeOverride(it as? IrFakeOverrideFunction ?: error("Unexpected fake override getter: $it"))
+        }
+        declaration.setter?.let {
+            it.correspondingPropertySymbol = declaration.symbol
+            linkFunctionFakeOverride(it as? IrFakeOverrideFunction ?: error("Unexpected fake override setter: $it"))
+        }
+    }
+}
+
 fun IrClass.addFakeOverrides(irBuiltIns: IrBuiltIns, implementedMembers: List<IrOverridableMember> = emptyList()) {
-    val fakeOverrideBuilder = IrOverridingUtil(irBuiltIns, object : FakeOverrideBuilderStrategy() {
-        override fun linkFakeOverride(fakeOverride: IrOverridableMember) {
-            when (fakeOverride) {
-                is IrFakeOverrideFunction -> linkFunctionFakeOverride(fakeOverride)
-                is IrFakeOverrideProperty -> linkPropertyFakeOverride(fakeOverride)
-                else -> error("Unexpected fake override: $fakeOverride")
-            }
-        }
-
-        private fun linkFunctionFakeOverride(declaration: IrFakeOverrideFunction) {
-            declaration.acquireSymbol(IrSimpleFunctionSymbolImpl(WrappedSimpleFunctionDescriptor()))
-        }
-
-        private fun linkPropertyFakeOverride(declaration: IrFakeOverrideProperty) {
-            val propertySymbol = IrPropertySymbolImpl(WrappedPropertyDescriptor())
-            declaration.getter?.let { it.correspondingPropertySymbol = propertySymbol }
-            declaration.setter?.let { it.correspondingPropertySymbol = propertySymbol }
-
-            declaration.acquireSymbol(propertySymbol)
-
-            declaration.getter?.let {
-                it.correspondingPropertySymbol = declaration.symbol
-                linkFunctionFakeOverride(it as? IrFakeOverrideFunction ?: error("Unexpected fake override getter: $it"))
-            }
-            declaration.setter?.let {
-                it.correspondingPropertySymbol = declaration.symbol
-                linkFunctionFakeOverride(it as? IrFakeOverrideFunction ?: error("Unexpected fake override setter: $it"))
-            }
-        }
-    })
-    val fakeOverrides = fakeOverrideBuilder.buildFakeOverridesForClassUsingOverriddenSymbols(this, implementedMembers)
-    fakeOverrides.forEach { addChild(it) }
+    IrOverridingUtil(irBuiltIns, FakeOverrideBuilder)
+        .buildFakeOverridesForClassUsingOverriddenSymbols(this, implementedMembers)
+        .forEach { addChild(it) }
 }
 
 @OptIn(ObsoleteDescriptorBasedAPI::class)
