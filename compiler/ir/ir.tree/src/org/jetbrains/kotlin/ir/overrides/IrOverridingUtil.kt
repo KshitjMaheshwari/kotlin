@@ -147,6 +147,8 @@ class IrOverridingUtil(
         clazz: IrClass,
         implementedMembers: List<IrOverridableMember> = emptyList()
     ): List<IrOverridableMember> {
+        fakeOverrideBuilder.propertyOverriddenSymbols.clear()
+
         val overriddenMembers = (clazz.declarations.filterIsInstance<IrOverridableMember>() + implementedMembers)
             .flatMap {
                 when (it) {
